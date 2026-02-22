@@ -7,22 +7,35 @@ def rastreador_dinamico(producto_busqueda):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
 
     try:
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        # Añadir un timeout es una excelente práctica para evitar que el proceso se quede colgado
+        response = requests.get(url, headers=headers, timeout=5) 
+        response.raise_for_status() # Verifica si hubo un error HTTP (ej. 404, 403)
+        
+        # Cambiamos a 'lxml' para máxima velocidad
+        soup = BeautifulSoup(response.text, 'lxml') 
         resultados = []
-        items = soup.find_all('li', {'class': 'ui-search-layout__item'})
-        for item in items[:10]:
-            titulo_tag = (
-                item.select_one('.poly-component__title') or
-                item.select_one('.ui-search-item__title') or
-                item.find('h2'))
+        
+        # Limitamos la búsqueda inicial a los primeros 10 elementos directamente en el DOM
+        items = soup.select('li.ui-search-layout__item', limit=10)
+        
+        for item in items:
+            titulo_tag = item.select_one('.poly-component__title, .ui-search-item__title, h2')
             titulo = titulo_tag.text.strip() if titulo_tag else 'Sin nombre'
-            precio_tag = item.find('span', {'class': 'andes-money-amount__fraction'})
+            
+            precio_tag = item.select_one('span.andes-money-amount__fraction')
             precio = int(precio_tag.text.replace('.', '')) if precio_tag else 0
-            link_tag = item.find('a', href=True)
+            
+            link_tag = item.select_one('a[href]')
             link = link_tag['href'] if link_tag else '#'
 
             resultados.append({'nombre': titulo, 'precio': precio, 'url': link})
+            
         return resultados
-    except Exception:
-        return[]
+        
+    except requests.exceptions.RequestException as e:
+        # Aquí puedes registrar (loguear) el error de red específicamente
+        print(f"Error de red: {e}")
+        return []
+    except Exception as e:
+        print(f"ERROR FATAL EN SCRAPER: {e}") # Mira tu terminal para ver este mensaje
+        return []
