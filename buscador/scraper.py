@@ -1,6 +1,8 @@
 import requests
 import random
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 CONFIG_MERCADO_LIBRE = {
     'item_container': 'li.ui-search-layout__item',
@@ -8,6 +10,12 @@ CONFIG_MERCADO_LIBRE = {
     'price': 'span.andes-money-amount__fraction',
     'link': 'a[href]'
 }
+
+# Optimización: Pool de conexiones TCP y reintentos automáticos
+session = requests.Session()
+retries = Retry(total=3, backoff_factor=0.3, status_forcelist=[500, 502, 503, 504])
+session.mount('https://', HTTPAdapter(max_retries=retries))
+
 def obtener_headers_aleatorios():
     user_agents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -17,29 +25,34 @@ def obtener_headers_aleatorios():
     return {'User-Agent': random.choice(user_agents)}
 
 def rastreador_dinamico(producto_busqueda):
+    if not producto_busqueda:
+        return []
+
     busqueda_fmt = producto_busqueda.replace(' ', '-')
     url = f"https://listado.mercadolibre.com.ar/{busqueda_fmt}_NoIndex_True"
     
     try:
-        # Usamos los headers aleatorios
-        response = requests.get(url, headers=obtener_headers_aleatorios(), timeout=5) 
+        # Uso de la sesión global en lugar de requests.get aislado
+        response = session.get(url, headers=obtener_headers_aleatorios(), timeout=5) 
         response.raise_for_status()
         
-        # Cambiamos a 'lxml' para máxima velocidad
-        soup = BeautifulSoup(response.text, 'lxml') 
+        # response.content es marginalmente más rápido que .text al pasarlo a lxml
+        soup = BeautifulSoup(response.content, 'lxml') 
         resultados = []
         
-        # Limitamos la búsqueda inicial a los primeros 10 elementos directamente en el DOM
-        items = soup.select('li.ui-search-layout__item', limit=10)
+        items = soup.select(CONFIG_MERCADO_LIBRE['item_container'], limit=10)
         
         for item in items:
             titulo_tag = item.select_one(CONFIG_MERCADO_LIBRE['title'])
+            precio_tag = item.select_one(CONFIG_MERCADO_LIBRE['price'])
+            link_tag = item.select_one(CONFIG_MERCADO_LIBRE['link'])
+            
             titulo = titulo_tag.text.strip() if titulo_tag else 'Sin nombre'
             
-            precio_tag = item.select_one(CONFIG_MERCADO_LIBRE['price'])
-            precio = int(precio_tag.text.replace('.', '')) if precio_tag else 0
+            # Sanitización de precio más robusta (evita errores si el precio tiene texto)
+            precio_str = precio_tag.text.replace('.', '') if precio_tag else '0'
+            precio = int(precio_str) if precio_str.isdigit() else 0
             
-            link_tag = item.select_one(CONFIG_MERCADO_LIBRE['link'])
             link = link_tag['href'] if link_tag else '#'
 
             resultados.append({'nombre': titulo, 'precio': precio, 'url': link})
@@ -47,9 +60,8 @@ def rastreador_dinamico(producto_busqueda):
         return resultados
         
     except requests.exceptions.RequestException as e:
-        # Aquí puedes registrar (loguear) el error de red específicamente
-        print(f"Error de red: {e}")
+        print(f"Error de red ({url}): {e}")
         return []
     except Exception as e:
-        print(f"ERROR FATAL EN SCRAPER: {e}") # Mira tu terminal para ver este mensaje
+        print(f"ERROR FATAL EN SCRAPER ({url}): {e}")
         return []

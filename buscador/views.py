@@ -1,23 +1,22 @@
+import hashlib
 from django.shortcuts import render
 from django.core.cache import cache
 from .scraper import rastreador_dinamico
-
 
 def inicio(request):
     query = request.GET.get("q", "").strip()
     resultados = []
 
     if query:
-        # Creamos una llave única para esta búsqueda
-        cache_key = f"busqueda_{query.replace(' ', '_').lower()}"
+        # Optimización: Hashing de la clave para garantizar seguridad y longitud fija
+        query_hash = hashlib.md5(query.lower().encode('utf-8')).hexdigest()
+        cache_key = f"busqueda_{query_hash}"
 
-        # Intentamos obtener los resultados de la memoria caché
         resultados = cache.get(cache_key)
         
         if not resultados:
             resultados = rastreador_dinamico(query)
-            # ¡NUEVO!: Solo guardar en caché si se encontraron productos
             if resultados: 
-                cache.set(cache_key, resultados, 900)
+                cache.set(cache_key, resultados, timeout=900)
 
     return render(request, "index.html", {"ofertas": resultados, "query": query})
