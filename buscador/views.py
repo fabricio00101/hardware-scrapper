@@ -50,3 +50,50 @@ def producto_detalle(request, producto_id):
         "fechas": fechas,
         "precios": precios
     })
+def inicio(request):
+    query = request.GET.get("q", "").strip()
+    sort_order = request.GET.get("sort", "asc") # Parámetro de ordenamiento
+    resultados = []
+
+    if query:
+        query_hash = hashlib.md5(query.lower().encode('utf-8')).hexdigest()
+        cache_key = f"busqueda_{query_hash}"
+
+        resultados = cache.get(cache_key)
+        
+        if not resultados:
+            resultados = rastreador_dinamico(query)
+            if resultados: 
+                try:
+                    with transaction.atomic():
+                        for item in resultados:
+                            producto, _ = Producto.objects.get_or_create(
+                                url=item['url'],
+                                defaults={'nombre': item['nombre'], 'tienda': 'Mercado Libre'}
+                            )
+                            HistorialPrecio.objects.create(producto=producto, precio=item['precio'])
+                            item['id'] = producto.id 
+                except Exception as e:
+                    print(f"Error guardando en DB: {e}")
+                
+                cache.set(cache_key, resultados, timeout=900)
+        
+        # Lógica de Ordenamiento en memoria (rápido, ya que son max 10-50 items)
+        if resultados:
+            reverse_sort = True if sort_order == "desc" else False
+            resultados = sorted(resultados, key=lambda x: x['precio'], reverse=reverse_sort)
+
+    return render(request, "index.html", {
+        "ofertas": resultados, 
+        "query": query, 
+        "current_sort": sort_order
+    })
+
+# NUEVAS VISTAS
+def seguimiento(request):
+    # Optimización: prefetch_related para evitar el problema N+1 al consultar la DB
+    productos = Producto.objects.all().prefetch_related('historial_precios').order_by('-creado_en')
+    return render(request, "seguimiento.html", {"productos": productos})
+
+def configuracion(request):
+    return render(request, "configuracion.html")
