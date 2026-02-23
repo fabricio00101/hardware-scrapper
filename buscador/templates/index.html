@@ -118,8 +118,8 @@
                                 </div>
                             </div>
                         </div>
-                        <a href="{{ producto.url }}" target="_blank" class="mt-auto w-full py-2 bg-slate-100 dark:bg-border-dark text-center text-xs font-bold rounded-lg hover:bg-primary hover:text-background-dark transition-all">
-                            VER OFERTA
+                        <a href="{% url 'producto_detalle' producto.id %}" class="mt-auto w-full py-2 bg-slate-100 dark:bg-border-dark text-center text-xs font-bold rounded-lg hover:bg-primary hover:text-background-dark transition-all flex justify-center items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">analytics</span> VER HISTORIAL
                         </a>
                     </div>
                     {% empty %}

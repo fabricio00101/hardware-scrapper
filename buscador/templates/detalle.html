@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Historial: {{ producto.nombre }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = { darkMode: "class", theme: { extend: { colors: { primary: "#25c0f4", background: "#101e22", surface: "#162529" }, fontFamily: { display: ["Inter", "sans-serif"] } } } }
+    </script>
+</head>
+
+<body class="bg-slate-50 dark:bg-background text-slate-900 dark:text-slate-100 font-display min-h-screen p-8">
+    <div
+        class="max-w-4xl mx-auto bg-white dark:bg-surface rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+        <a href="/" class="flex items-center gap-2 text-primary font-bold text-sm mb-6 hover:underline">
+            <span class="material-symbols-outlined text-sm">arrow_back</span> Volver al Buscador
+        </a>
+        <h1 class="text-2xl font-bold mb-2 leading-tight">{{ producto.nombre }}</h1>
+        <div class="flex items-center gap-4 mb-8 text-sm text-slate-400">
+            <span class="bg-primary/10 text-primary px-3 py-1 rounded-full font-bold">{{ producto.tienda }}</span>
+            <a href="{{ producto.url }}" target="_blank"
+                class="flex items-center gap-1 hover:text-white transition-colors">
+                Ir a la tienda <span class="material-symbols-outlined text-sm">open_in_new</span>
+            </a>
+        </div>
+
+        <div
+            class="w-full h-[400px] bg-slate-100 dark:bg-[#111c1f] rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+            <canvas id="priceChart"></canvas>
+        </div>
+    </div>
+{{ fechas|json_script:"fechas-data" }}
+        {{ precios|json_script:"precios-data" }}
+
+        <div class="w-full h-[400px] bg-slate-100 dark:bg-[#111c1f] rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+            <canvas id="priceChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // 2. Extracción limpia y tipada en JavaScript
+        const chartLabels = JSON.parse(document.getElementById('fechas-data').textContent);
+        const chartPrices = JSON.parse(document.getElementById('precios-data').textContent);
+
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    label: 'Precio ($)',
+                    data: chartPrices,
+                    borderColor: '#25c0f4',
+                    backgroundColor: 'rgba(37, 192, 244, 0.1)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#101e22',
+                    pointBorderColor: '#25c0f4',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { ticks: { color: '#9cb2ba' }, grid: { color: '#283539' } },
+                    x: { ticks: { color: '#9cb2ba' }, grid: { display: false } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

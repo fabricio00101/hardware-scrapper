@@ -1,5 +1,5 @@
 import hashlib
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.core.cache import cache
 from django.db import transaction
 from .scraper import rastreador_dinamico
@@ -13,35 +13,40 @@ def inicio(request):
         query_hash = hashlib.md5(query.lower().encode('utf-8')).hexdigest()
         cache_key = f"busqueda_{query_hash}"
 
-        # 1. Intentamos obtener de caché (Respuesta ultra rápida)
         resultados = cache.get(cache_key)
         
         if not resultados:
-            # 2. Si no hay caché, ejecutamos el Scraper
             resultados = rastreador_dinamico(query)
-            
             if resultados: 
-                # 3. Persistencia Segura y Atómica en Base de Datos
                 try:
                     with transaction.atomic():
                         for item in resultados:
-                            # Buscar o crear el hardware por su URL única
-                            producto, created = Producto.objects.get_or_create(
+                            producto, _ = Producto.objects.get_or_create(
                                 url=item['url'],
-                                defaults={
-                                    'nombre': item['nombre'], 
-                                    'tienda': 'Mercado Libre'
-                                }
+                                defaults={'nombre': item['nombre'], 'tienda': 'Mercado Libre'}
                             )
-                            # Registrar el precio actual en la línea de tiempo
-                            HistorialPrecio.objects.create(
-                                producto=producto,
-                                precio=item['precio']
-                            )
+                            HistorialPrecio.objects.create(producto=producto, precio=item['precio'])
+                            # Inyectamos el ID relacional al diccionario para el frontend
+                            item['id'] = producto.id 
                 except Exception as e:
                     print(f"Error guardando en DB: {e}")
                 
-                # 4. Guardar en caché para los próximos 15 minutos
                 cache.set(cache_key, resultados, timeout=900)
 
     return render(request, "index.html", {"ofertas": resultados, "query": query})
+
+def producto_detalle(request, producto_id):
+    producto = get_object_or_404(Producto, id=producto_id)
+    
+    # Query optimizado: solo extrae columnas específicas sin instanciar objetos pesados
+    historial = producto.historial_precios.order_by('fecha_registro').values('fecha_registro', 'precio')
+    
+    # Serialización de vectores para el gráfico en JS
+    fechas = [h['fecha_registro'].strftime('%d/%m %H:%M') for h in historial]
+    precios = [float(h['precio']) for h in historial]
+    
+    return render(request, "detalle.html", {
+        "producto": producto,
+        "fechas": fechas,
+        "precios": precios
+    })
