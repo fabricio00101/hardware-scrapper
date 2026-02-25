@@ -5,36 +5,6 @@ from django.db import transaction
 from .scraper import rastreador_dinamico
 from .models import Producto, HistorialPrecio
 
-def inicio(request):
-    query = request.GET.get("q", "").strip()
-    resultados = []
-
-    if query:
-        query_hash = hashlib.md5(query.lower().encode('utf-8')).hexdigest()
-        cache_key = f"busqueda_{query_hash}"
-
-        resultados = cache.get(cache_key)
-        
-        if not resultados:
-            resultados = rastreador_dinamico(query)
-            if resultados: 
-                try:
-                    with transaction.atomic():
-                        for item in resultados:
-                            producto, _ = Producto.objects.get_or_create(
-                                url=item['url'],
-                                defaults={'nombre': item['nombre'], 'tienda': 'Mercado Libre'}
-                            )
-                            HistorialPrecio.objects.create(producto=producto, precio=item['precio'])
-                            # Inyectamos el ID relacional al diccionario para el frontend
-                            item['id'] = producto.id 
-                except Exception as e:
-                    print(f"Error guardando en DB: {e}")
-                
-                cache.set(cache_key, resultados, timeout=900)
-
-    return render(request, "index.html", {"ofertas": resultados, "query": query})
-
 def producto_detalle(request, producto_id):
     producto = get_object_or_404(Producto, id=producto_id)
     
