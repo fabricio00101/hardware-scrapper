@@ -46,7 +46,7 @@
             <div class="flex items-center justify-between mb-8">
                 <div>
                     <h2 class="text-2xl font-bold tracking-tight mb-1">Tu Inventario de Seguimiento</h2>
-                    <p class="text-sm text-slate-500">Monitoreando {{ productos|length }} componentes en la base de datos.</p>
+                    <p class="text-sm text-slate-500">Monitoreando {{ page_obj.paginator.count }} componentes en la base de datos.</p>
                 </div>
             </div>
 
@@ -61,7 +61,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-border-dark">
-                        {% for producto in productos %}
+                        {% for producto in page_obj %}
                         <tr class="hover:bg-slate-50 dark:hover:bg-border-dark/50 transition-colors group">
                             <td class="px-6 py-4 font-medium text-slate-900 dark:text-white line-clamp-1">{{ producto.nombre }}</td>
                             <td class="px-6 py-4">
@@ -86,6 +86,36 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                
+                <!-- Paginación -->
+                {% if page_obj.has_other_pages %}
+                <div class="px-6 py-4 border-t border-slate-200 dark:border-border-dark bg-slate-50 dark:bg-surface-dark flex items-center justify-between">
+                    <div class="text-sm text-slate-500 dark:text-slate-400">
+                        Mostrando página <span class="font-medium text-slate-900 dark:text-white">{{ page_obj.number }}</span> de <span class="font-medium text-slate-900 dark:text-white">{{ page_obj.paginator.num_pages }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1 text-sm border border-slate-200 dark:border-border-dark text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-border-dark rounded-md transition-colors">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <button disabled class="px-3 py-1 text-sm border border-slate-200 dark:border-border-dark text-slate-400 dark:text-slate-500 opacity-50 cursor-not-allowed rounded-md">
+                            Anterior
+                        </button>
+                        {% endif %}
+
+                        {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1 text-sm border border-slate-200 dark:border-border-dark text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-border-dark rounded-md transition-colors">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <button disabled class="px-3 py-1 text-sm border border-slate-200 dark:border-border-dark text-slate-400 dark:text-slate-500 opacity-50 cursor-not-allowed rounded-md">
+                            Siguiente
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </main>

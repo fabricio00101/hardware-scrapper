@@ -1,9 +1,6 @@
-import hashlib
 from django.shortcuts import render, get_object_or_404
-from django.core.cache import cache
-from django.db import transaction
-from .scraper import rastreador_dinamico
 from .models import Producto, HistorialPrecio
+from .services import obtener_resultados_busqueda
 
 def producto_detalle(request, producto_id):
     producto = get_object_or_404(Producto, id=producto_id)
@@ -23,35 +20,12 @@ def producto_detalle(request, producto_id):
 def inicio(request):
     query = request.GET.get("q", "").strip()
     sort_order = request.GET.get("sort", "asc") # Parámetro de ordenamiento
-    resultados = []
+    resultados = obtener_resultados_busqueda(query)
 
-    if query:
-        query_hash = hashlib.md5(query.lower().encode('utf-8')).hexdigest()
-        cache_key = f"busqueda_{query_hash}"
-
-        resultados = cache.get(cache_key)
-        
-        if not resultados:
-            resultados = rastreador_dinamico(query)
-            if resultados: 
-                try:
-                    with transaction.atomic():
-                        for item in resultados:
-                            producto, _ = Producto.objects.get_or_create(
-                                url=item['url'],
-                                defaults={'nombre': item['nombre'], 'tienda': 'Mercado Libre'}
-                            )
-                            HistorialPrecio.objects.create(producto=producto, precio=item['precio'])
-                            item['id'] = producto.id 
-                except Exception as e:
-                    print(f"Error guardando en DB: {e}")
-                
-                cache.set(cache_key, resultados, timeout=900)
-        
-        # Lógica de Ordenamiento en memoria (rápido, ya que son max 10-50 items)
-        if resultados:
-            reverse_sort = True if sort_order == "desc" else False
-            resultados = sorted(resultados, key=lambda x: x['precio'], reverse=reverse_sort)
+    # Lógica de Ordenamiento en memoria (rápido, ya que son max 10-50 items de caché/scraping por request)
+    if resultados:
+        reverse_sort = True if sort_order == "desc" else False
+        resultados = sorted(resultados, key=lambda x: x['precio'], reverse=reverse_sort)
 
     return render(request, "index.html", {
         "ofertas": resultados, 
@@ -59,11 +33,19 @@ def inicio(request):
         "current_sort": sort_order
     })
 
+from django.core.paginator import Paginator
+
 # NUEVAS VISTAS
 def seguimiento(request):
     # Optimización: prefetch_related para evitar el problema N+1 al consultar la DB
-    productos = Producto.objects.all().prefetch_related('historial_precios').order_by('-creado_en')
-    return render(request, "seguimiento.html", {"productos": productos})
+    productos_list = Producto.objects.all().prefetch_related('historial_precios').order_by('-creado_en')
+    
+    # Mostrar 10 productos por página.
+    paginator = Paginator(productos_list, 10) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "seguimiento.html", {"page_obj": page_obj})
 
 def configuracion(request):
     return render(request, "configuracion.html")

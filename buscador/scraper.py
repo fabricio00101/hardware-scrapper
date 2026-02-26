@@ -1,8 +1,11 @@
 import requests
 import random
+import logging
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+logger = logging.getLogger(__name__)
 
 CONFIG_MERCADO_LIBRE = {
     'item_container': 'li.ui-search-layout__item',
@@ -60,8 +63,8 @@ def rastreador_dinamico(producto_busqueda):
         return resultados
         
     except requests.exceptions.RequestException as e:
-        print(f"Error de red ({url}): {e}")
+        logger.error(f"Error de red durante scraping de Meli ({url}): {e}")
         return []
     except Exception as e:
-        print(f"ERROR FATAL EN SCRAPER ({url}): {e}")
+        logger.error(f"ERROR FATAL EN SCRAPER ({url}): {e}", exc_info=True)
         return []
